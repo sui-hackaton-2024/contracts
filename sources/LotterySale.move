@@ -19,8 +19,8 @@ module LotterySale::LotterySale {
     // --- structs
 
     // manages ownership rights for a Sale
-    public struct SaleCap {
-        id: ID, // Unique identifier for the SaleCap
+    public struct SaleCap has key, store  {
+        id: UID, // Unique identifier for the SaleCap
         owner: address,      // Address of the owner of this SaleCap
     }
     
@@ -28,42 +28,48 @@ module LotterySale::LotterySale {
     public struct Sale has key, store {
         id: UID, // Unique sale identifier (based on object UID)
         owner: address,
-        cap_id: ID, // Reference to the SaleCap
+        cap: SaleCap, // Reference to the SaleCap
         deposit_price: u64,  // beware the unit is in Mist not SUI
         participants: vector<address>,
         is_active: bool,
         total_collected: u64, // Track total amount collected from participants
     }
 
+    public fun create_sale_cap(
+        ctx: &mut TxContext,
+    ){
+        // we create a SaleCap struct to handle the right to call restricted fonctions
+        // pass the salecap id to the create_sale() function to inject it into the Sale itself
+        // + verifier le owner du cap dans les fonctions à restreindre
+
+        let sale_cap = SaleCap {
+            id: sui::object::new(ctx),  // Create a new SaleCap object
+            owner: tx_context::sender(ctx),  // Set the owner of the SaleCap to the caller
+        };
+        // private send
+        transfer::transfer(sale_cap, tx_context::sender(ctx));
+    }
     
     // Function to create a sale
     public fun create_sale(
+        sale_cap: SaleCap,  // Mutable reference to the SaleCap object
         deposit_price: u64,
         ctx: &mut TxContext,
     ) {
         assert!(deposit_price > 0, EInvalidDepositPrice);
 
-        // we create a SaleCap struct to handle the right to call restricted fonctions
-        // pass the salecap id to the create_sale() function to inject it into the Sale itself
-        // + verifier le owner du cap dans les fonctions à restreindre
-
         // Create a new SaleCap instance
-        let sale_cap = SaleCap {
-            id: sui::object::new(ctx), // Create a new SaleCap object
-            owner: tx_context::sender(ctx), // Set the owner of the SaleCap to the caller
-        };
-        // private send
-        transfer::transfer(sale_cap, tx_context::sender(ctx));
 
         let sale = Sale {
             id: sui::object::new(ctx),
             owner: tx_context::sender(ctx),
-            cap_id: sale_cap.id,  // Reference to the SaleCap
-            deposit_price,
+            cap: sale_cap, // TODO inject the salecap
+            deposit_price, 
             participants: vector::empty(),
             is_active: true,
             total_collected: 0,
         };
+
         // Share the object to make it accessible to everyone
         transfer::public_share_object(sale)
     }
