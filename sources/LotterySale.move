@@ -6,11 +6,12 @@ module LotterySale::LotterySale {
     use sui::object::UID;
     use sui::transfer;
     use sui::tx_context::TxContext;
+    use sui::sui::SUI;
 
     // error codes
     const EInvalidDepositPrice: u64 = 1;
-    // const EInactiveSale: u64 = 2;
-    // const EInvalidPayment: u64 = 3;
+    const EInactiveSale: u64 = 2;
+    const EInvalidPayment: u64 = 3;
 
     // --- structs
     
@@ -21,8 +22,6 @@ module LotterySale::LotterySale {
         deposit_price: u64,  // TODO allow for floating numbers
         participants: vector<address>,
         is_active: bool,
-        total_collected: u64,
-        deposits: vector<u64>,
     }
 
     
@@ -38,10 +37,35 @@ module LotterySale::LotterySale {
             deposit_price,
             participants: vector::empty(),
             is_active: true,
-            total_collected: 0,
-            deposits: vector::empty(),
         };
         transfer::transfer(sale, tx_context::sender(ctx));
+    }
+
+
+    // Function to participate in a sale
+    public fun participate(
+        sale_id: UID,
+        amount: Coin<SUI>,
+        ctx: &mut TxContext,
+    ) {
+        // Retrieve the sale object mutably
+        let sale = get_mut<Sale>(sale_id); // Get a mutable reference to the Sale object
+
+        // Check if the sale is active
+        assert!(sale.is_active, EInactiveSale);
+
+        // Get the payment amount from the coin
+        let payment_amount = sui::coin::value(&amount); // Get the value of the payment coin
+
+        // Check if the payment is sufficient
+        assert!(payment_amount >= sale.deposit_price, EInvalidPayment);
+
+        // Add the caller to the participants list
+        let caller = tx_context::sender(ctx);
+        vector::push_back(&mut sale.participants, caller);
+
+        // Transfer the payment to the sale owner
+        sui::coin::transfer(amount, sale.owner, ctx); // Transfer the actual coin object
     }
 
 /*
