@@ -1,3 +1,5 @@
+// next try a version with a shared object ?
+// also a USDC version
 
 module LotterySale::LotterySale {    
     use sui::coin::Coin; // For handling SUI coin operations
@@ -20,7 +22,7 @@ module LotterySale::LotterySale {
     public struct Sale has key {
         id: UID, // Unique sale identifier (based on object UID)
         owner: address,
-        deposit_price: u64,  // TODO allow for floating numbers
+        deposit_price: u64,  // beware the unit is in Mist not SUI
         participants: vector<address>,
         is_active: bool,
         total_collected: u64, // Track total amount collected from participants
@@ -83,29 +85,92 @@ module LotterySale::LotterySale {
 
     // Function to participate in a sale
     public fun participate(
+        sale: &mut Sale,                // Mutable reference to the sale object
+        inputCoins: &mut Coin<SUI>,     // Mutable reference to the payment coin
+        ctx: &mut TxContext,            // Transaction context
+    ) {
+        // Check if the sale is active
+        assert!(sale.is_active, EInactiveSale);
+
+        // Split the inputCoins to create a new coin for the payment
+        let payment_coin = sui::coin::split(inputCoins, sale.deposit_price, ctx); 
+
+        // Get the payment amount from the newly created coin
+        let payment_amount = sui::coin::value(&payment_coin); // Get the value of the payment coin (in mist, not SUI)
+
+        // Check if the payment is sufficient
+        assert!(payment_amount >= sale.deposit_price, EInvalidPayment); // Ensure payment is sufficient
+
+        let caller = tx_context::sender(ctx); // Get the caller's address
+
+        // Calculate the change
+        let change_amount = payment_amount - sale.deposit_price;
+
+        let mut mut_payment_coin = payment_coin; // Make payment_coin mutable again
+
+        // Add the caller to the participants list
+        vector::push_back(&mut sale.participants, caller);
+
+        // Update the total collected amount
+        sale.total_collected = sale.total_collected + sale.deposit_price;
+
+        // If there's change, return it to the sender
+        if (change_amount > 0) {
+            // Create a new coin for the change
+            // (note we cannot mint native SUI, mint is only for tokens)
+            let change_coin = sui::coin::split(&mut mut_payment_coin, change_amount, ctx);
+            // Transfer both coins in the same context
+            transfer::public_transfer(change_coin, caller);           // Transfer the change to the caller
+            transfer::public_transfer(mut_payment_coin, sale.owner);      // Transfer the payment to the sale owner
+        } else {
+            // If there's no change, just transfer the full payment to the sale owner
+            transfer::public_transfer(mut_payment_coin, sale.owner);
+        }
+    }
+
+    
+/*
+    // Function to participate in a sale
+    public fun participate(
         sale: &mut Sale,
-        amount: Coin<SUI>,
+        inputCoins: &mut Coin<SUI>,
         ctx: &mut TxContext,
     ) {
         // Check if the sale is active
         assert!(sale.is_active, EInactiveSale);
 
         // Get the payment amount from the coin
-        let payment_amount = sui::coin::value(&amount); // Get the value of the payment coin
+        // let payment_amount = sui::coin::value(inputCoins); // Get the value of the payment coin (in mist not SUI)
+        let payment_amount = sui::coin::value(&inputCoins);
 
         // Check if the payment is sufficient
-        assert!(payment_amount != sale.deposit_price, EInvalidPayment);
+        assert!(payment_amount < sale.deposit_price, EInvalidPayment);
+
+        let caller = tx_context::sender(ctx);
+
+        // Calculate the change
+        let change_amount = payment_amount - sale.deposit_price;
+        // If there's change, return it to the sender
+        if (change_amount > 0) {
+            sui::pay::split_and_transfer(inputCoins, change_amount, caller, ctx);
+            // Create a new coin for the change
+            // let change_coin = sui::coin::mint(change_amount);
+            // // Transfer the change back to the caller
+            // coin::transfer(change_coin, caller);
+        };
 
         // Add the caller to the participants list
-        let caller = tx_context::sender(ctx);
         vector::push_back(&mut sale.participants, caller);
 
         sale.total_collected = sale.total_collected + payment_amount;
 
         // Transfer the payment to the sale owner
-        // sui::coin::transfer(amount, sale.owner, ctx); 
-        sui::transfer::public_transfer(amount, sale.owner)
+        let balance = sui::coin::into_balance(inputCoins);
+        // let balance = sui::coin::into_balance(&mut inputCoins);
+        let owner_payment = sui::coin::take(&mut balance, sale.deposit_price, ctx);
+        sui::transfer::public_transfer(owner_payment, sale.owner);
     }
+    */
 
 /* // useless ?
     // Function for the sale owner to withdraw collected funds
