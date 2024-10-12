@@ -12,6 +12,7 @@ module LotterySale::LotterySale {
     const EInvalidDepositPrice: u64 = 1;
     const EInactiveSale: u64 = 2;
     const EInvalidPayment: u64 = 3;
+    const EUnauthorizedWithdrawal: u64 = 4;
 
     // --- structs
     
@@ -22,6 +23,7 @@ module LotterySale::LotterySale {
         deposit_price: u64,  // TODO allow for floating numbers
         participants: vector<address>,
         is_active: bool,
+        total_collected: u64, // Track total amount collected from participants
     }
 
     
@@ -37,11 +39,12 @@ module LotterySale::LotterySale {
             deposit_price,
             participants: vector::empty(),
             is_active: true,
+            total_collected: 0,
         };
         transfer::transfer(sale, tx_context::sender(ctx));
     }
 
-
+/*
     // Function to participate in a sale
     public fun participate(
         sale_id: UID,
@@ -49,7 +52,8 @@ module LotterySale::LotterySale {
         ctx: &mut TxContext,
     ) {
         // Retrieve the sale object mutably
-        let sale = get_mut<Sale>(sale_id); // Get a mutable reference to the Sale object
+        let sale_ref = sui::object::borrow_mut<Sale>(sale_id, ctx);
+        // let sale = borrow_global_mut<Sale>(sale_id); // Get a mutable reference to the Sale object
 
         // Check if the sale is active
         assert!(sale.is_active, EInactiveSale);
@@ -64,9 +68,67 @@ module LotterySale::LotterySale {
         let caller = tx_context::sender(ctx);
         vector::push_back(&mut sale.participants, caller);
 
+        // commenting to leave the funds into the contract ?
         // Transfer the payment to the sale owner
-        sui::coin::transfer(amount, sale.owner, ctx); // Transfer the actual coin object
+        // sui::coin::transfer(amount, sale.owner, ctx); // Transfer the actual coin object
+        // Instead of transferring, update total collected        
+        let sale = borrow_global_mut<Sale>(sale_id);
+        let new_total = sale.total_collected + payment_amount;
+        *sale = Sale {
+            total_collected: new_total,
+        };
+
     }
+    */
+
+    // Function to participate in a sale
+    public fun participate(
+        sale: &mut Sale,
+        amount: Coin<SUI>,
+        ctx: &mut TxContext,
+    ) {
+        // Check if the sale is active
+        assert!(sale.is_active, EInactiveSale);
+
+        // Get the payment amount from the coin
+        let payment_amount = sui::coin::value(&amount); // Get the value of the payment coin
+
+        // Check if the payment is sufficient
+        assert!(payment_amount != sale.deposit_price, EInvalidPayment);
+
+        // Add the caller to the participants list
+        let caller = tx_context::sender(ctx);
+        vector::push_back(&mut sale.participants, caller);
+
+        sale.total_collected = sale.total_collected + payment_amount;
+
+        // Transfer the payment to the sale owner
+        // sui::coin::transfer(amount, sale.owner, ctx); 
+        sui::transfer::public_transfer(amount, sale.owner)
+    }
+
+/* // useless ?
+    // Function for the sale owner to withdraw collected funds
+    public fun withdraw_funds(
+        sale: &mut Sale,
+        ctx: &mut TxContext,
+    ) {        
+        // Ensure that the caller is the sale owner
+        assert!(tx_context::sender(ctx) == sale.owner, EUnauthorizedWithdrawal);
+
+        // Transfer the collected funds to the owner
+        let amount_to_transfer = sale.total_collected;
+
+        // Create a new Coin<SUI> from the collected amount, assuming you have a way to do this
+        let collected_coin = sui::coin::create(amount_to_transfer); // This will depend on your SUI implementation
+
+        // Transfer the coin to the owner
+        sui::coin::transfer(collected_coin, sale.owner, ctx);
+
+        // Reset total collected to zero after withdrawal
+        sale.total_collected = 0;
+    }
+    */
 
 /*
     // struct representing a participation in the sale
