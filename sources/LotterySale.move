@@ -79,6 +79,7 @@ module LotterySale::LotterySale {
         inputCoins: &mut Coin<SUI>,     // Mutable reference to the payment coin
         ctx: &mut TxContext,            // Transaction context
     ) {
+
         // Check if the sale is active
         assert!(sale.is_active, EInactiveSale);
 
