@@ -17,11 +17,18 @@ module LotterySale::LotterySale {
     const EUnauthorizedWithdrawal: u64 = 4;
 
     // --- structs
+
+    // manages ownership rights for a Sale
+    public struct SaleCap {
+        id: ID, // Unique identifier for the SaleCap
+        owner: address,      // Address of the owner of this SaleCap
+    }
     
     // Struct representing a Sale
-    public struct Sale has key {
+    public struct Sale has key, store {
         id: UID, // Unique sale identifier (based on object UID)
         owner: address,
+        cap_id: ID, // Reference to the SaleCap
         deposit_price: u64,  // beware the unit is in Mist not SUI
         participants: vector<address>,
         is_active: bool,
@@ -35,53 +42,31 @@ module LotterySale::LotterySale {
         ctx: &mut TxContext,
     ) {
         assert!(deposit_price > 0, EInvalidDepositPrice);
+
+        // we create a SaleCap struct to handle the right to call restricted fonctions
+        // pass the salecap id to the create_sale() function to inject it into the Sale itself
+        // + verifier le owner du cap dans les fonctions à restreindre
+
+        // Create a new SaleCap instance
+        let sale_cap = SaleCap {
+            id: sui::object::new(ctx), // Create a new SaleCap object
+            owner: tx_context::sender(ctx), // Set the owner of the SaleCap to the caller
+        };
+        // private send
+        transfer::transfer(sale_cap, tx_context::sender(ctx));
+
         let sale = Sale {
             id: sui::object::new(ctx),
             owner: tx_context::sender(ctx),
+            cap_id: sale_cap.id,  // Reference to the SaleCap
             deposit_price,
             participants: vector::empty(),
             is_active: true,
             total_collected: 0,
         };
-        transfer::transfer(sale, tx_context::sender(ctx));
+        // Share the object to make it accessible to everyone
+        transfer::public_share_object(sale)
     }
-
-/*
-    // Function to participate in a sale
-    public fun participate(
-        sale_id: UID,
-        amount: Coin<SUI>,
-        ctx: &mut TxContext,
-    ) {
-        // Retrieve the sale object mutably
-        let sale_ref = sui::object::borrow_mut<Sale>(sale_id, ctx);
-        // let sale = borrow_global_mut<Sale>(sale_id); // Get a mutable reference to the Sale object
-
-        // Check if the sale is active
-        assert!(sale.is_active, EInactiveSale);
-
-        // Get the payment amount from the coin
-        let payment_amount = sui::coin::value(&amount); // Get the value of the payment coin
-
-        // Check if the payment is sufficient
-        assert!(payment_amount >= sale.deposit_price, EInvalidPayment);
-
-        // Add the caller to the participants list
-        let caller = tx_context::sender(ctx);
-        vector::push_back(&mut sale.participants, caller);
-
-        // commenting to leave the funds into the contract ?
-        // Transfer the payment to the sale owner
-        // sui::coin::transfer(amount, sale.owner, ctx); // Transfer the actual coin object
-        // Instead of transferring, update total collected        
-        let sale = borrow_global_mut<Sale>(sale_id);
-        let new_total = sale.total_collected + payment_amount;
-        *sale = Sale {
-            total_collected: new_total,
-        };
-
-    }
-    */
 
     // Function to participate in a sale
     public fun participate(
@@ -124,10 +109,47 @@ module LotterySale::LotterySale {
             transfer::public_transfer(mut_payment_coin, sale.owner);      // Transfer the payment to the sale owner
         } else {
             // If there's no change, just transfer the full payment to the sale owner
+            // beware putting this line outside of the else block breaks the function
             transfer::public_transfer(mut_payment_coin, sale.owner);
         }
     }
 
+
+    /*
+    // Function to participate in a sale
+    public fun participate(
+        sale_id: UID,
+        amount: Coin<SUI>,
+        ctx: &mut TxContext,
+    ) {
+        // Retrieve the sale object mutably
+        let sale_ref = sui::object::borrow_mut<Sale>(sale_id, ctx);
+        // let sale = borrow_global_mut<Sale>(sale_id); // Get a mutable reference to the Sale object
+
+        // Check if the sale is active
+        assert!(sale.is_active, EInactiveSale);
+
+        // Get the payment amount from the coin
+        let payment_amount = sui::coin::value(&amount); // Get the value of the payment coin
+
+        // Check if the payment is sufficient
+        assert!(payment_amount >= sale.deposit_price, EInvalidPayment);
+
+        // Add the caller to the participants list
+        let caller = tx_context::sender(ctx);
+        vector::push_back(&mut sale.participants, caller);
+
+        // commenting to leave the funds into the contract ?
+        // Transfer the payment to the sale owner
+        // sui::coin::transfer(amount, sale.owner, ctx); // Transfer the actual coin object
+        // Instead of transferring, update total collected        
+        let sale = borrow_global_mut<Sale>(sale_id);
+        let new_total = sale.total_collected + payment_amount;
+        *sale = Sale {
+            total_collected: new_total,
+        };
+    }
+    */
     
 /*
     // Function to participate in a sale
