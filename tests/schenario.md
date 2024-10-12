@@ -11,5 +11,7 @@ This is a terminal scenario that allows to create a Sale with a SaleCap and from
 # export COIN_ID=<some SUI coin in your wallet or objects?>
 # ex: export COIN_ID=0xedb8008f1cce5756da3fea2cdcff7e01c368729219f5c3ea057fad3efd0c9150
 # sui client call --function participate --module LotterySale --package $PACKAGE_ID --args $SALE_ID $COIN_ID --gas-budget 100000000
+
 # ex after participate: 0x130fbfe0a3913fcc4fa2d918af66252ec27da44cbfac020a3fac9f18aff684d3
+# you can see 2 wallets participating in the auction here: https://suiscan.xyz/testnet/object/0x130fbfe0a3913fcc4fa2d918af66252ec27da44cbfac020a3fac9f18aff684d3/txs
 
