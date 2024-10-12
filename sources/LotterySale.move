@@ -1,43 +1,50 @@
-/// Module
-module LotterySale::LotterySale {
+
+module LotterySale::LotterySale {    
+    use sui::coin::Coin; // For handling SUI coin operations
+    use sui::random::Random; // For randomness
     use std::string::String;
+    use sui::object::{Self, UID};
+    use sui::transfer;
+    use sui::tx_context::{Self, TxContext};
 
-    /// List of todos. Can be managed by the owner and shared with others.
-    // we specify "key" to be able to reference it again once deployed
-    // and "store" to keep data in the global state
-    public struct TodoList has key, store {
-        id: UID,
-        items: vector<String>
+    // Struct representing a Sale, refactored to store UID for object-based management
+    public struct Sale has key, store  { // 'key' allows this struct to be stored on-chain
+        id: UID, // Unique identifier for the Sale
+        owner: address,
+        deposit_price: u64, // in SUI cents
+        participants: vector<address>,
+        is_active: bool,
+        total_collected: u64,
+        deposits: vector<u64>, // Store deposits of each participant
+        // nft_ticket: Option<NFT>, // Placeholder for future NFT integration
     }
 
-    /// Create a new todo list.
-    public fun new(ctx: &mut TxContext): TodoList {
-        let list = TodoList {
-            id: object::new(ctx),
-            items: vector[]
-        };
-
-        (list)
+    // Event emitted when a sale is created
+    public struct SaleCreated has copy, drop, store {
+        sale_id: u64,
+        owner: address,
+        deposit_price: u64,
     }
 
-    /// Add a new todo item to the list.
-    public fun add(list: &mut TodoList, item: String) {
-        list.items.push_back(item);
+    // Event emitted when a user participates
+    public struct Participation has copy, drop, store {
+        sale_id: u64,
+        participant: address,
     }
 
-    /// Remove a todo item from the list by index.
-    public fun remove(list: &mut TodoList, index: u64): String {
-        list.items.remove(index)
+    // Event emitted when the lottery is triggered
+    public struct LotteryTriggered has copy, drop, store {
+        sale_id: u64,
+        winner: address,
     }
 
-    /// Delete the list and the capability to manage it.
-    public fun delete(list: TodoList) {
-        let TodoList { id, items: _ } = list;
-        id.delete();
+    // Sale counter to generate unique sale IDs
+    public struct SaleCounter has store {
+        count: u64,
     }
 
-    /// Get the number of items in the list.
-    public fun length(list: &TodoList): u64 {
-        list.items.length()
-    }
+    // ------------------------
+
+
+
 }
