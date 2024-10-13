@@ -13,7 +13,8 @@ module LotterySale::LotterySale {
     const EInvalidDepositPrice: u64 = 1;
     const EInactiveSale: u64 = 2;
     const EInvalidPayment: u64 = 3;
-    const EUnauthorizedWithdrawal: u64 = 4;
+    // const EUnauthorizedWithdrawal: u64 = 4;
+    const EInvalidNBWinners: u64 = 5;
 
     // --- structs
 
@@ -30,6 +31,7 @@ module LotterySale::LotterySale {
         cap: SaleCap, // Reference to the SaleCap
         deposit_price: u64,  // beware the unit is in Mist not SUI
         participants: vector<address>,
+        nb_winners: u64, // Number of possible winners
         is_active: bool,
         total_collected: u64, // Track total amount collected from participants
     }
@@ -53,9 +55,13 @@ module LotterySale::LotterySale {
     public fun create_sale(
         sale_cap: SaleCap,  // Mutable reference to the SaleCap object
         deposit_price: u64,
+        nb_winners: u64,  // Number of winners for the sale
         ctx: &mut TxContext,
     ) {
+        // ensure deposit price > 0
         assert!(deposit_price > 0, EInvalidDepositPrice);
+        // Ensure there is at least one winner
+        assert!(nb_winners > 0, EInvalidNBWinners);
 
         // Create a new SaleCap instance
 
@@ -65,6 +71,7 @@ module LotterySale::LotterySale {
             cap: sale_cap, // TODO inject the salecap
             deposit_price, 
             participants: vector::empty(),
+            nb_winners,
             is_active: true,
             total_collected: 0,
         };
