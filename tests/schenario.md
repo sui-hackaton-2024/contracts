@@ -1,5 +1,7 @@
 This is a terminal scenario that allows to create a Sale with a SaleCap and from another wallet to participate into the LotterySale
 
+(note this was before adding nb_winners in the args)
+
 # this wallet will own the SaleCap
 # export PACKAGE_ID=0xf9424b3cf95e969a21628cab6e8a07fe494be7d23938e789fd2ee165dc31534e
 # sui client call --package $PACKAGE_ID --module LotterySale --function create_sale_cap --gas-budget 10000
