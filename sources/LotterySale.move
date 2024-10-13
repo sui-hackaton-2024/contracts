@@ -36,6 +36,13 @@ module LotterySale::LotterySale {
         total_collected: u64, // Track total amount collected from participants
     }
 
+    public struct NFT has key, store {
+    id: UID,              // Unique identifier for the NFT
+    owner: address,       // Address of the owner of the NFT
+    metadata: String,     // Metadata for the NFT (can include name, description, etc.)
+    }
+
+
     public fun create_sale_cap(
         ctx: &mut TxContext,
     ){
@@ -152,4 +159,69 @@ module LotterySale::LotterySale {
         sale.total_collected = 0;
     }
     */
+    public fun mint_nft(recipient: &address, ctx: &mut TxContext) -> NFT {
+    // Create a new NFT
+    let nft = NFT {
+        id: sui::object::new(ctx),  // Generate a new UID for the NFT
+        owner: *recipient,           // Set the recipient as the owner
+        metadata: String::from("Lottery NFT"), // Metadata for the NFT (customize as needed)
+    };
+
+    // Transfer the NFT to the recipient
+    transfer::transfer(nft, *recipient);
+
+    return nft; // Return the minted NFT object
+}
+
+    public fun decide_winners(
+    sale: &mut Sale,
+    ctx: &mut TxContext,
+) {
+    // Deactivate the auction
+    sale.is_active = false;
+
+    // Check number of participants
+    let num_participants = vector::length(&sale.participants);
+    
+    if num_participants == 0 {
+        assert!(false, ENoParticipants); // Error if no participants
+    }
+
+    if num_participants <= sale.nb_winners {
+        // Everyone wins an NFT
+        for participant in &sale.participants {
+            // Logic to mint NFT and assign it to the participant
+            let nft = mint_nft(participant, ctx); // Mint NFT for the participant
+        }
+    } else {
+        // Randomly select winners
+        let mut winners: vector<address> = vector::empty();
+        let mut rng = Random::new(ctx); // Create a new random number generator
+
+        while vector::length(&winners) < sale.nb_winners {
+            let index = Random::next_u64(&mut rng) % num_participants; // Get a random index
+            let winner = vector::borrow(&sale.participants, index);
+
+            if !vector::contains(&winners, winner) {
+                vector::push_back(&mut winners, winner); // Add winner if not already in the list
+            }
+        }
+
+        // Mint NFTs for the winners
+        for winner in &winners {
+            // Logic to mint NFT and assign it to the winner
+            let nft = mint_nft(winner, ctx); // Mint NFT for the winner
+        }
+
+        // Refund others
+        for participant in &sale.participants {
+            if !vector::contains(&winners, participant) {
+                // Logic to create a new Coin<SUI> from the refund amount
+                let refund_coin = sui::coin::create(sale.deposit_price); // Create a new coin for the refund
+                transfer::public_transfer(refund_coin, *participant); // Transfer the refund to the participant
+            }
+        }
+    }
+}
+
 }
